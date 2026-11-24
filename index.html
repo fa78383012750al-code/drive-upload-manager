@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>مدير رفع الملفات إلى Google Drive</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{--blue:#1a73e8;--bg:#f5f7fb;--ink:#172033;--muted:#667085;--line:#e5e9f0;--green:#188038;--red:#d93025}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Tahoma,sans-serif}
+.wrap{max-width:1100px;margin:28px auto;padding:0 16px}.hero{background:linear-gradient(120deg,#174ea6,#4285f4);color:#fff;border-radius:22px;padding:26px;box-shadow:0 12px 30px #174ea622}
+h1{margin:0 0 8px;font-size:25px}.hero p{margin:0;color:#e8f0fe;line-height:1.8}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 4px 16px #1b2b4510}
+h2{font-size:18px;margin:0 0 15px}.muted{color:var(--muted);font-size:13px;line-height:1.7}
+button,.btn{border:0;border-radius:11px;padding:11px 16px;background:var(--blue);color:#fff;font-weight:700;cursor:pointer;font-size:14px}
+button:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#eef3fd;color:#174ea6}.danger{background:#fce8e6;color:#b3261e}
+input,select{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;background:white;color:var(--ink);margin:7px 0 12px}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.account{border:1px solid var(--line);padding:10px;border-radius:12px;margin:8px 0;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.account small{display:block;color:var(--muted);margin-top:4px}.account.active{border-color:var(--blue);background:#f3f7ff}
+.drop{border:2px dashed #9bbcf2;border-radius:16px;padding:28px 14px;text-align:center;background:#f8fbff;cursor:pointer;line-height:1.9}
+.drop.over{background:#e8f0fe;border-color:var(--blue)}.drop strong{display:block;color:#174ea6}
+.file{border:1px solid var(--line);padding:12px;border-radius:12px;margin-top:9px}
+.filetop{display:flex;justify-content:space-between;gap:10px;font-size:13px}.bar{height:8px;background:#edf0f5;border-radius:99px;overflow:hidden;margin-top:9px}.bar i{display:block;height:100%;width:0;background:var(--blue);transition:width .15s}
+.status{font-size:12px;color:var(--muted);margin-top:6px}.ok{color:var(--green)}.err{color:var(--red)}
+.history{max-height:300px;overflow:auto}.history-item{padding:10px 0;border-bottom:1px solid var(--line);font-size:13px;line-height:1.7}
+.notice{background:#fff8e1;border:1px solid #f4d77b;padding:12px;border-radius:12px;font-size:13px;line-height:1.8;margin-top:14px}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:22px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.wrap{margin:14px auto}.hero{padding:20px}h1{font-size:21px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <header class="hero">
+  <h1>مدير رفع الملفات إلى Google Drive</h1>
+  <p>اربط أكثر من حساب Google، اختر الحساب والمجلد، ثم ارفع ملفاتك مع متابعة التقدم وسجل العمليات.</p>
+ </header>
+
+ <div class="grid">
+  <section class="card">
+   <h2>١. إعداد التطبيق والحسابات</h2>
+   <label class="muted" for="clientId">OAuth Client ID (نوع Web application)</label>
+   <input id="clientId" placeholder="ضع Client ID المنتهي بـ apps.googleusercontent.com">
+   <div class="row">
+    <button id="saveConfig">حفظ الإعداد</button>
+    <button class="secondary" id="connect">إضافة / اختيار حساب Google</button>
+   </div>
+   <p class="muted">يمكن إضافة عدة حسابات. لأسباب أمنية، تحفظ الصفحة رموز الوصول في الذاكرة فقط؛ بعد إعادة تحميل الصفحة سجّل الدخول مجدداً.</p>
+   <div id="accounts"><p class="muted">لم تتم إضافة حسابات بعد.</p></div>
+   <div class="notice">لا تضع Client Secret أو Private Key أو ملف Service Account JSON هنا. لا تشارك رمز الوصول مع أي شخص.</div>
+  </section>
+
+  <section class="card">
+   <h2>٢. اختيار مجلد الرفع</h2>
+   <label class="muted" for="folder">المجلد المتاح للتطبيق</label>
+   <select id="folder"><option value="root">المجلد الرئيسي (My Drive)</option></select>
+   <div class="row">
+    <button class="secondary" id="refreshFolders">تحديث المجلدات</button>
+    <button class="secondary" id="newFolder">إنشاء مجلد</button>
+   </div>
+   <p class="muted" id="folderNote">سجّل الدخول أولاً لعرض المجلدات التي يستطيع التطبيق الوصول إليها.</p>
+  </section>
+ </div>
+
+ <section class="card" style="margin-top:16px">
+  <h2>٣. اختيار الملفات ورفعها</h2>
+  <div class="drop" id="drop">
+   <strong>اسحب الملفات وأفلتها هنا</strong>
+   أو اضغط لاختيار ملفات من جهازك
+   <input type="file" id="picker" multiple hidden>
+  </div>
+  <div class="row" style="margin-top:12px">
+   <div><label class="muted" for="target">الحساب المستهدف</label><select id="target"><option value="">اختر حساباً</option></select></div>
+   <div style="align-self:end"><button id="upload" disabled>بدء رفع الملفات</button></div>
+  </div>
+  <div id="queue"></div>
+ </section>
+
+ <section class="card" style="margin-top:16px">
+  <div class="row"><h2 style="margin:0">٤. سجل عمليات الرفع</h2><button class="secondary" id="clearHistory" style="flex:0 0 auto">مسح السجل</button></div>
+  <div class="history" id="history"></div>
+  <p class="muted">السجل محفوظ محلياً في هذا المتصفح ولا يحتوي على رموز الدخول.</p>
+ </section>
+ <footer>واجهة تجريبية مستقلة — تتصل مباشرة بخدمات Google الرسمية عند إعداد OAuth بشكل صحيح.</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const accounts = new Map(); // tokens remain in memory only
+let selectedFiles = [];
+let activeId = null;
+let tokenClient = null;
+
+function say(el, text, cls=''){ el.textContent=text; el.className=cls; }
+function config(){ return $('clientId').value.trim(); }
+function current(){ return accounts.get($('target').value || activeId); }
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+$('saveConfig').onclick=()=>{
+ const id=config();
+ if(!id.endsWith('.apps.googleusercontent.com')) return alert('أدخل OAuth Client ID الصحيح لتطبيق Web.');
+ localStorage.setItem('driveUploaderClientId',id);
+ alert('تم حفظ Client ID محلياً. تأكد من إعداد Authorized JavaScript origins في Google Cloud.');
+};
+const saved=localStorage.getItem('driveUploaderClientId'); if(saved)$('clientId').value=saved;
+
+function renderAccounts(){
+ const box=$('accounts'), target=$('target');
+ box.innerHTML=''; target.innerHTML='<option value="">اختر حساباً</option>';
+ for(const [id,a] of accounts){
+  const div=document.createElement('div'); div.className='account '+(id===activeId?'active':'');
+  div.innerHTML=`<span>Google account<small>${escapeHtml(a.email)}</small></span><button class="secondary" data-use="${escapeHtml(id)}">استخدام</button>`;
+  box.appendChild(div);
+  const op=document.createElement('option');op.value=id;op.textContent=a.email;target.appendChild(op);
+ }
+ if(activeId && accounts.has(activeId)) target.value=activeId;
+ box.querySelectorAll('[data-use]').forEach(b=>b.onclick=()=>{activeId=b.dataset.use;$('target').value=activeId;renderAccounts();loadFolders();});
+ $('upload').disabled=!accounts.size || !selectedFiles.length;
+}
+
+function initGoogle(){
+ if(!window.google?.accounts?.oauth2) return alert('مكتبة Google لم تجهز بعد. حدّث الصفحة وحاول مجدداً.');
+ const id=config();
+ if(!id.endsWith('.apps.googleusercontent.com')) return alert('أدخل Client ID أولاً.');
+ tokenClient=google.accounts.oauth2.initTokenClient({
+  client_id:id,
+  scope:'openid email https://www.googleapis.com/auth/drive.file',
+  include_granted_scopes:true,
+  prompt:'select_account',
+  callback: async (resp)=>{
+   if(resp.error) return alert('تعذر التفويض: '+resp.error);
+   try{
+    const u=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+resp.access_token}});
+    if(!u.ok) throw new Error('تعذر قراءة حساب Google');
+    const profile=await u.json();
+    const key=profile.sub || profile.email;
+    accounts.set(key,{email:profile.email || 'حساب Google',token:resp.access_token,expires:Date.now()+(Number(resp.expires_in||3600)-60)*1000});
+    activeId=key;renderAccounts();await loadFolders();
+   }catch(e){alert(e.message);}
+  }
+ });
+ tokenClient.requestAccessToken({prompt:'select_account'});
+}
+$('connect').onclick=initGoogle;
+$('target').onchange=()=>{activeId=$('target').value;renderAccounts();loadFolders();};
+
+async function validAccount(){
+ const id=$('target').value || activeId, a=accounts.get(id);
+ if(!a) throw new Error('اختر حساب Google أولاً.');
+ if(a.expires<Date.now()) throw new Error('انتهت صلاحية الجلسة. اضغط إضافة / اختيار حساب وسجّل الدخول مجدداً.');
+ return a;
+}
+async function api(url, options={}){
+ const a=await validAccount();
+ const headers=new Headers(options.headers||{});
+ headers.set('Authorization','Bearer '+a.token);
+ const res=await fetch(url,{...options,headers});
+ if(!res.ok){let msg='Google API error '+res.status;try{const j=await res.json();msg=j.error?.message||msg;}catch{}throw new Error(msg);}
+ return res.status===204?null:res.json();
+}
+async function loadFolders(){
+ try{
+  await validAccount();
+  const data=await api('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent("mimeType='application/vnd.google-apps.folder' and trashed=false")+'&fields=files(id,name)&pageSize=100&orderBy=name');
+  const sel=$('folder'), old=sel.value;sel.innerHTML='<option value="root">المجلد الرئيسي (My Drive)</option>';
+  for(const f of data.files||[]){const o=document.createElement('option');o.value=f.id;o.textContent=f.name;sel.appendChild(o);}
+  if([...sel.options].some(o=>o.value===old))sel.value=old;
+  say($('folderNote'),'تم تحميل المجلدات التي يملك التطبيق صلاحية الوصول إليها.');
+ }catch(e){say($('folderNote'),e.message,'err');}
+}
+$('refreshFolders').onclick=loadFolders;
+$('newFolder').onclick=async()=>{
+ const name=prompt('اكتب اسم المجلد الجديد:');if(!name?.trim())return;
+ try{
+  const parent=$('folder').value;
+  const body={name:name.trim(),mimeType:'application/vnd.google-apps.folder'};
+  if(parent!=='root')body.parents=[parent];
+  const f=await api('https://www.googleapis.com/drive/v3/files?fields=id,name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  await loadFolders();$('folder').value=f.id;alert('تم إنشاء المجلد.');
+ }catch(e){alert(e.message);}
+};
+
+const drop=$('drop'), picker=$('picker');
+drop.onclick=()=>picker.click();
+picker.onchange=()=>addFiles(picker.files);
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('over');};
+drop.ondragleave=()=>drop.classList.remove('over');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');addFiles(e.dataTransfer.files);};
+function addFiles(list){selectedFiles.push(...Array.from(list));renderQueue();$('upload').disabled=!selectedFiles.length||!accounts.size;}
+function renderQueue(){
+ $('queue').innerHTML='';
+ selectedFiles.forEach((f,i)=>{
+  const d=document.createElement('div');d.className='file';
+  d.innerHTML=`<div class="filetop"><strong>${escapeHtml(f.name)}</strong><span>${(f.size/1048576).toFixed(2)} MB</span></div><div class="bar"><i id="p${i}"></i></div><div class="status" id="s${i}">في قائمة الانتظار</div>`;
+  $('queue').appendChild(d);
+ });
+}
+function logHistory(name,email,status,url=''){
+ const list=JSON.parse(localStorage.getItem('driveUploaderHistory')||'[]');
+ list.unshift({name,email,status,url,time:new Date().toLocaleString('ar')});
+ localStorage.setItem('driveUploaderHistory',JSON.stringify(list.slice(0,100)));renderHistory();
+}
+function renderHistory(){
+ const list=JSON.parse(localStorage.getItem('driveUploaderHistory')||'[]');
+ $('history').innerHTML=list.length?list.map(x=>`<div class="history-item"><b>${escapeHtml(x.name)}</b> — ${escapeHtml(x.status)}<br><span class="muted">${escapeHtml(x.email)} · ${escapeHtml(x.time)}</span>${x.url?`<br><a href="${escapeHtml(x.url)}" target="_blank" rel="noopener">فتح الملف في Drive</a>`:''}</div>`).join(''):'<p class="muted">لا توجد عمليات مسجلة بعد.</p>';
+}
+$('clearHistory').onclick=()=>{if(confirm('هل تريد مسح سجل الرفع المحلي؟')){localStorage.removeItem('driveUploaderHistory');renderHistory();}};
+renderHistory();
+
+async function uploadOne(file,index,account){
+ const status=$('s'+index), bar=$('p'+index);
+ try{
+  const parent=$('folder').value;
+  const metadata={name:file.name};
+  if(parent!=='root')metadata.parents=[parent];
+  // Start a resumable upload session (recommended by Google for large files).
+  const start=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,webViewLink',{
+   method:'POST',
+   headers:{Authorization:'Bearer '+account.token,'Content-Type':'application/json; charset=UTF-8','X-Upload-Content-Type':file.type||'application/octet-stream','X-Upload-Content-Length':String(file.size)},
+   body:JSON.stringify(metadata)
+  });
+  if(!start.ok)throw new Error('تعذر بدء الرفع ('+start.status+').');
+  const session=start.headers.get('Location');
+  if(!session)throw new Error('لم يرجع Google رابط جلسة الرفع.');
+  const result=await new Promise((resolve,reject)=>{
+   const xhr=new XMLHttpRequest();xhr.open('PUT',session);
+   xhr.setRequestHeader('Content-Type',file.type||'application/octet-stream');
+   xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);bar.style.width=pct+'%';say(status,'جارٍ الرفع: '+pct+'%');}};
+   xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300){try{resolve(JSON.parse(xhr.responseText));}catch{reject(new Error('استجابة غير مفهومة من Drive'));}}else reject(new Error('فشل رفع الملف: '+xhr.status));};
+   xhr.onerror=()=>reject(new Error('انقطع الاتصال أثناء الرفع.'));
+   xhr.send(file);
+  });
+  bar.style.width='100%';say(status,'اكتمل الرفع','status ok');
+  logHistory(file.name,account.email,'تم الرفع بنجاح',result.webViewLink||('https://drive.google.com/file/d/'+result.id+'/view'));
+ }catch(e){say(status,e.message,'status err');logHistory(file.name,account.email,'فشل: '+e.message);}
+}
+$('upload').onclick=async()=>{
+ try{
+  const a=await validAccount();$('upload').disabled=true;
+  for(let i=0;i<selectedFiles.length;i++)await uploadOne(selectedFiles[i],i,a);
+  selectedFiles=[];picker.value='';$('queue').innerHTML='';$('upload').disabled=true;
+ }catch(e){alert(e.message);}
+};
+</script>
+</body>
+</html>
